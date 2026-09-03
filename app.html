@@ -102,7 +102,21 @@
   .shop-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:18px;box-shadow:var(--shadow-soft);}
   .shop-card h3{font-size:1rem;}
   .shop-card .price{font-family:var(--font-display);color:var(--color-accent2);font-size:1.2rem;margin:6px 0;}
-  .cart-bar{position:sticky;bottom:0;background:var(--color-surface);border-top:1px solid var(--color-border);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 -10px 30px -12px rgba(0,0,0,.5);}
+  .shop-card .variant-field{margin-bottom:10px;}
+  .shop-card .variant-field label{display:block;font-size:.78rem;font-weight:700;margin-bottom:4px;color:var(--color-ink-soft);text-transform:uppercase;}
+  .shop-card .variant-field select{width:100%;padding:9px 10px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-ink);font-family:var(--font-body);font-size:.9rem;}
+  .cart-bar{position:sticky;bottom:0;background:var(--color-surface);border-top:1px solid var(--color-border);padding:14px 20px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -10px 30px -12px rgba(0,0,0,.5);max-height:60vh;overflow-y:auto;}
+  .cart-lines{display:flex;flex-direction:column;gap:8px;}
+  .cart-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--color-surface-alt);border-radius:var(--radius-sm);padding:8px 12px;}
+  .cart-line .cl-name{font-weight:700;font-size:.86rem;color:var(--color-ink);}
+  .cart-line .cl-variant{font-size:.76rem;color:var(--color-ink-soft);}
+  .cart-line .cl-controls{display:flex;align-items:center;gap:8px;}
+  .qty-stepper{display:flex;align-items:center;gap:6px;}
+  .qty-stepper button{width:26px;height:26px;border-radius:50%;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-ink);font-weight:700;cursor:pointer;line-height:1;}
+  .qty-stepper button:hover{border-color:var(--color-primary);color:var(--color-primary);}
+  .cart-line .cl-subtotal{font-weight:700;color:var(--color-accent2);font-size:.86rem;min-width:70px;text-align:right;}
+  .cart-line .cl-remove{background:transparent;border:0;color:var(--color-danger);font-size:1rem;cursor:pointer;padding:2px 6px;}
+  .cart-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--color-border);}
 
   /* ---------- fan: compras / cupones ---------- */
   .orders-list{display:grid;gap:16px;}
@@ -144,7 +158,7 @@
   .modal.modal-wide{max-width:760px;}
   .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;}
   .modal-close{background:var(--color-surface-alt);border:0;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1.1rem;color:var(--color-ink);flex:none;}
-  .row-product{display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px;}
+  .row-product{display:grid;grid-template-columns:1.6fr 1.1fr .8fr auto;gap:10px;align-items:end;margin-bottom:10px;}
   .radio-group{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
   .radio-group label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:.9rem;color:var(--color-ink);}
 
@@ -264,9 +278,12 @@
     <div id="panelTienda" role="tabpanel" aria-labelledby="tabTiendaBtn">
       <div class="shop-grid" id="shopGrid" aria-live="polite"></div>
     </div>
-    <div class="cart-bar" id="cartBar" hidden>
-      <span id="cartSummary" style="font-weight:700;"></span>
-      <button class="btn btn-accent" id="cartCheckoutBtn">Comprar</button>
+    <div class="cart-bar" id="cartBar" hidden aria-live="polite">
+      <div class="cart-lines" id="cartLines"></div>
+      <div class="cart-footer">
+        <span id="cartSummary" style="font-weight:700;"></span>
+        <button class="btn btn-accent" id="cartCheckoutBtn">Comprar</button>
+      </div>
     </div>
 
     <!-- ---- MIS COMPRAS ---- -->
@@ -453,7 +470,7 @@
       <h2 style="font-size:1.15rem;">Cupones generados</h2>
       <div class="table-wrap card">
         <table>
-          <thead><tr><th>Código</th><th>Fan</th><th>% Descuento</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Código</th><th>Fan</th><th>% Descuento</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
           <tbody id="couponsTableBody"></tbody>
         </table>
       </div>
@@ -840,7 +857,7 @@ $('#registerForm').addEventListener('submit', async (e) => {
 // VISTA FAN
 // ============================================================
 let productsCache = [];
-let cart = []; // [{product_id, nombre, precio, cantidad}]
+let cart = []; // [{product_id, nombre, precio, cantidad, variante_elegida}]
 
 async function initFan() {
   initFanTabs();
@@ -881,12 +898,25 @@ function productDisponible(p) {
   return recetas.every(r => Number(r.supplies?.stock_actual || 0) >= Number(r.cantidad_consumida || 0));
 }
 
+// Si "variante" viene como "Talles S/M/L/XL" (o similar, con "/" separando
+// opciones), devuelve el arreglo de opciones para mostrar un <select>. Si
+// es un valor único (ej. "Único", o vacío), devuelve null: no hace falta
+// elegir nada.
+function parseVariantOptions(variante) {
+  if (!variante) return null;
+  const m = variante.match(/:?\s*([^:]+\/[^:]+)$/); // toma la parte después de ":" si la hay, con al menos un "/"
+  const raw = m ? m[1] : variante;
+  if (!raw.includes('/')) return null;
+  return raw.split('/').map(s => s.trim()).filter(Boolean);
+}
+
 function renderShop() {
   const grid = $('#shopGrid');
   grid.innerHTML = '';
   if (!productsCache.length) { grid.innerHTML = '<p class="empty">Todavía no hay productos cargados.</p>'; return; }
   productsCache.forEach(p => {
     const disponible = productDisponible(p);
+    const options = parseVariantOptions(p.variante);
     const card = document.createElement('div');
     card.className = 'shop-card';
     card.innerHTML = `
@@ -894,6 +924,14 @@ function renderShop() {
       ${p.variante ? `<p style="margin:0 0 4px;">${escapeHtml(p.variante)}</p>` : ''}
       <div class="price">${fmtMoney(p.precio)}</div>
       <p style="margin-bottom:10px;">${disponible ? '<span class="badge badge-ok">Disponible</span>' : '<span class="badge badge-bajo">Agotado</span>'}</p>
+      ${options ? `
+        <div class="variant-field">
+          <label for="talle-${p.id}">Elegí talle/variante</label>
+          <select id="talle-${p.id}" class="shop-variant-select">
+            <option value="">— Elegir —</option>
+            ${options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+          </select>
+        </div>` : ''}
       <button class="btn btn-primary btn-sm btn-block" ${disponible ? '' : 'disabled'} data-add="${p.id}">Agregar al carrito</button>
     `;
     grid.appendChild(card);
@@ -904,17 +942,61 @@ function renderShop() {
 function addToCart(productId) {
   const p = productsCache.find(x => x.id === productId);
   if (!p) return;
-  const existing = cart.find(c => c.product_id === productId);
+  const options = parseVariantOptions(p.variante);
+  let varianteElegida = null;
+  if (options) {
+    const sel = $(`#talle-${productId}`);
+    varianteElegida = sel ? sel.value : '';
+    if (!varianteElegida) {
+      toast(`Elegí un talle/variante para "${p.nombre}" antes de agregarlo.`, 'error');
+      return;
+    }
+  }
+  const existing = cart.find(c => c.product_id === productId && c.variante_elegida === varianteElegida);
   if (existing) existing.cantidad++;
-  else cart.push({ product_id: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1 });
+  else cart.push({ product_id: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1, variante_elegida: varianteElegida });
   renderCart();
-  toast(`Agregaste "${p.nombre}" al carrito.`);
+  toast(`Agregaste "${p.nombre}"${varianteElegida ? ' (' + varianteElegida + ')' : ''} al carrito.`);
+}
+
+function changeCartQty(index, delta) {
+  const line = cart[index];
+  if (!line) return;
+  line.cantidad += delta;
+  if (line.cantidad <= 0) cart.splice(index, 1);
+  renderCart();
+}
+
+function removeCartLine(index) {
+  cart.splice(index, 1);
+  renderCart();
 }
 
 function renderCart() {
   const bar = $('#cartBar');
   if (!cart.length) { bar.hidden = true; return; }
   bar.hidden = false;
+  const linesWrap = $('#cartLines');
+  linesWrap.innerHTML = cart.map((c, i) => `
+    <div class="cart-line">
+      <div>
+        <div class="cl-name">${escapeHtml(c.nombre)}</div>
+        ${c.variante_elegida ? `<div class="cl-variant">Talle/variante: ${escapeHtml(c.variante_elegida)}</div>` : ''}
+      </div>
+      <div class="cl-controls">
+        <div class="qty-stepper">
+          <button type="button" data-qty-minus="${i}" aria-label="Restar una unidad de ${escapeHtml(c.nombre)}">−</button>
+          <span>${c.cantidad}</span>
+          <button type="button" data-qty-plus="${i}" aria-label="Sumar una unidad de ${escapeHtml(c.nombre)}">+</button>
+        </div>
+        <span class="cl-subtotal">${fmtMoney(c.precio * c.cantidad)}</span>
+        <button type="button" class="cl-remove" data-remove-line="${i}" aria-label="Quitar ${escapeHtml(c.nombre)} del carrito">✕</button>
+      </div>
+    </div>`).join('');
+  $$('[data-qty-minus]', linesWrap).forEach(btn => btn.addEventListener('click', () => changeCartQty(Number(btn.dataset.qtyMinus), -1)));
+  $$('[data-qty-plus]', linesWrap).forEach(btn => btn.addEventListener('click', () => changeCartQty(Number(btn.dataset.qtyPlus), 1)));
+  $$('[data-remove-line]', linesWrap).forEach(btn => btn.addEventListener('click', () => removeCartLine(Number(btn.dataset.removeLine))));
+
   const total = cart.reduce((s, c) => s + c.precio * c.cantidad, 0);
   const unidades = cart.reduce((s, c) => s + c.cantidad, 0);
   $('#cartSummary').textContent = `${unidades} producto(s) — ${fmtMoney(total)}`;
@@ -926,7 +1008,7 @@ async function checkoutCart() {
     const { data: newOrder, error: orderError } = await db.from('orders')
       .insert({ profile_id: currentUser.id, canal: 'online' }).select().single();
     if (orderError) throw new Error(orderError.message);
-    const items = cart.map(c => ({ order_id: newOrder.id, product_id: c.product_id, cantidad: c.cantidad, precio_unitario: c.precio }));
+    const items = cart.map(c => ({ order_id: newOrder.id, product_id: c.product_id, cantidad: c.cantidad, precio_unitario: c.precio, variante_elegida: c.variante_elegida || null }));
     const { error: itemsError } = await db.from('order_items').insert(items);
     if (itemsError) throw new Error(itemsError.message);
     toast('¡Compra registrada! La vas a ver en "Mis compras".');
@@ -940,7 +1022,7 @@ async function checkoutCart() {
 
 async function loadFanOrders() {
   const { data } = await db.from('orders')
-    .select('id, estado, canal, fecha, notas, order_items(id, cantidad, precio_unitario, subtotal, products(nombre))')
+    .select('id, estado, canal, fecha, notas, order_items(id, cantidad, precio_unitario, subtotal, variante_elegida, products(nombre))')
     .eq('profile_id', currentUser.id)
     .order('fecha', { ascending: false });
   renderFanOrders(data || []);
@@ -953,7 +1035,7 @@ function orderTotal(order) {
 function renderOrderCard(order) {
   const items = order.order_items || [];
   const itemsHtml = items.map(it =>
-    `<li><span>${escapeHtml(it.products?.nombre || 'Producto')} × ${it.cantidad}</span><span>${fmtMoney(it.subtotal)}</span></li>`
+    `<li><span>${escapeHtml(it.products?.nombre || 'Producto')}${it.variante_elegida ? ' (' + escapeHtml(it.variante_elegida) + ')' : ''} × ${it.cantidad}</span><span>${fmtMoney(it.subtotal)}</span></li>`
   ).join('');
   return `
     <div class="order-card">
@@ -981,7 +1063,7 @@ async function loadFanCoupons() {
   data.forEach(c => {
     const chip = document.createElement('div');
     chip.className = 'coupon-chip';
-    chip.textContent = `🎟️ ${c.codigo} — ${c.porcentaje_descuento}% OFF`;
+    chip.innerHTML = `🎟️ ${escapeHtml(c.codigo)} — ${c.porcentaje_descuento}% OFF<br><span style="font-weight:600;font-size:.72rem;">Válido hasta ${fmtDate(c.vence_el)}</span>`;
     wrap.appendChild(chip);
   });
 }
@@ -1149,7 +1231,7 @@ async function loadSalesBoard() {
     .select(`id, estado, canal, fecha, notas, profile_id, fan_id,
       profiles(nombre, apellido, telefono, email),
       fans_manual(nombre, apellido, telefono),
-      order_items(id, cantidad, precio_unitario, subtotal, product_id, products(nombre))`)
+      order_items(id, cantidad, precio_unitario, subtotal, product_id, variante_elegida, products(nombre))`)
     .order('fecha', { ascending: false });
   if (error) { toast('No pudimos cargar las ventas.', 'error'); return; }
   salesCache = data || [];
@@ -1213,11 +1295,15 @@ $$('input[name="fanMode"]').forEach(r => r.addEventListener('change', () => {
 function addProductRow() {
   const row = document.createElement('div');
   row.className = 'row-product';
-  const options = productsAdminCache.filter(p => p.activo).map(p => `<option value="${p.id}" data-precio="${p.precio}">${escapeHtml(p.nombre)}${p.variante ? ' (' + escapeHtml(p.variante) + ')' : ''} — ${fmtMoney(p.precio)}</option>`).join('');
+  const options = productsAdminCache.filter(p => p.activo).map(p => `<option value="${p.id}" data-precio="${p.precio}" data-variante="${escapeHtml(p.variante || '')}">${escapeHtml(p.nombre)}${p.variante ? ' (' + escapeHtml(p.variante) + ')' : ''} — ${fmtMoney(p.precio)}</option>`).join('');
   row.innerHTML = `
     <div class="field" style="margin-bottom:0;">
       <label>Producto</label>
       <select class="row-product-select">${options}</select>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Talle/variante</label>
+      <select class="row-product-variant"><option value="">—</option></select>
     </div>
     <div class="field" style="margin-bottom:0;">
       <label>Cantidad</label>
@@ -1225,10 +1311,27 @@ function addProductRow() {
     </div>
     <button type="button" class="btn btn-outline btn-sm row-remove" aria-label="Quitar producto">✕</button>`;
   row.querySelector('.row-remove').addEventListener('click', () => { row.remove(); updateSaleNewTotal(); });
-  row.querySelector('.row-product-select').addEventListener('change', updateSaleNewTotal);
+  row.querySelector('.row-product-select').addEventListener('change', () => { refreshRowVariantOptions(row); updateSaleNewTotal(); });
   row.querySelector('.row-product-qty').addEventListener('input', updateSaleNewTotal);
   $('#saleProductRows').appendChild(row);
+  refreshRowVariantOptions(row);
   updateSaleNewTotal();
+}
+
+// Reconstruye el <select> de talle/variante según el producto elegido en
+// esa fila (usa el mismo parser que la tienda del fan).
+function refreshRowVariantOptions(row) {
+  const sel = row.querySelector('.row-product-select');
+  const opt = sel.options[sel.selectedIndex];
+  const variantSel = row.querySelector('.row-product-variant');
+  const options = opt ? parseVariantOptions(opt.dataset.variante) : null;
+  if (!options) {
+    variantSel.innerHTML = '<option value="">—</option>';
+    variantSel.disabled = true;
+  } else {
+    variantSel.disabled = false;
+    variantSel.innerHTML = '<option value="">Elegir…</option>' + options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+  }
 }
 $('#addProductRowBtn').addEventListener('click', addProductRow);
 
@@ -1274,13 +1377,18 @@ $('#saleNewForm').addEventListener('submit', async (e) => {
     const rows = $$('.row-product', $('#saleProductRows')).map(row => {
       const sel = row.querySelector('.row-product-select');
       const opt = sel.options[sel.selectedIndex];
+      const variantSel = row.querySelector('.row-product-variant');
       return {
         product_id: sel.value,
         precio_unitario: Number(opt?.dataset.precio || 0),
-        cantidad: Number(row.querySelector('.row-product-qty').value || 0)
+        cantidad: Number(row.querySelector('.row-product-qty').value || 0),
+        variante_requerida: variantSel && !variantSel.disabled,
+        variante_elegida: variantSel ? variantSel.value : ''
       };
     }).filter(r => r.product_id && r.cantidad > 0);
     if (!rows.length) throw new Error('Agregá al menos un producto con cantidad válida.');
+    const sinTalle = rows.find(r => r.variante_requerida && !r.variante_elegida);
+    if (sinTalle) throw new Error('Elegí el talle/variante de todos los productos que lo requieren.');
 
     const notas = $('#saleNotas').value.trim() || null;
 
@@ -1289,7 +1397,7 @@ $('#saleNewForm').addEventListener('submit', async (e) => {
       .select().single();
     if (orderError) throw new Error('No pudimos crear la venta: ' + orderError.message);
 
-    const itemsToInsert = rows.map(r => ({ order_id: newOrder.id, product_id: r.product_id, cantidad: r.cantidad, precio_unitario: r.precio_unitario }));
+    const itemsToInsert = rows.map(r => ({ order_id: newOrder.id, product_id: r.product_id, cantidad: r.cantidad, precio_unitario: r.precio_unitario, variante_elegida: r.variante_elegida || null }));
     const { error: itemsError } = await db.from('order_items').insert(itemsToInsert);
     if (itemsError) throw new Error('La venta se creó pero hubo un error cargando los productos: ' + itemsError.message);
 
@@ -1312,7 +1420,7 @@ async function openSaleDetail(orderId) {
   const waPhone = phone ? (phone.startsWith('54') ? phone : ('54' + phone.replace(/^0/, ''))) : '';
 
   const itemsRows = (order.order_items || []).map(it => `
-    <tr><td>${escapeHtml(it.products?.nombre || '')}</td><td>${it.cantidad}</td><td>${fmtMoney(it.precio_unitario)}</td><td>${fmtMoney(it.subtotal)}</td></tr>
+    <tr><td>${escapeHtml(it.products?.nombre || '')}${it.variante_elegida ? ' <span class="badge badge-confirmado-show">' + escapeHtml(it.variante_elegida) + '</span>' : ''}</td><td>${it.cantidad}</td><td>${fmtMoney(it.precio_unitario)}</td><td>${fmtMoney(it.subtotal)}</td></tr>
   `).join('');
 
   let actionsHtml = '';
@@ -1689,10 +1797,11 @@ async function renderCoupons() {
       <td>${escapeHtml(c.codigo)}</td>
       <td>${escapeHtml(nombre)}</td>
       <td>${c.porcentaje_descuento}%</td>
+      <td>${fmtDate(c.vence_el)}</td>
       <td><span class="badge badge-${c.estado}">${c.estado}</span></td>
       <td>${c.estado === 'activo' ? `<button class="btn btn-outline btn-sm" data-use-coupon="${c.id}">Marcar usado</button>` : ''}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="5" class="empty">Todavía no se generaron cupones.</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Todavía no se generaron cupones.</td></tr>';
 
   $$('[data-use-coupon]', $('#couponsTableBody')).forEach(btn => {
     btn.addEventListener('click', () => {
