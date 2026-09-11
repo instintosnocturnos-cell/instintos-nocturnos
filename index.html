@@ -180,7 +180,7 @@
     padding:16px 24px;max-width:1160px;margin:0 auto;
   }
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--color-ink);}
-  .brand-mark{width:42px;height:42px;flex:none;}
+  .brand-mark{width:42px;height:42px;flex:none;object-fit:contain;}
   .brand-name{font-family:var(--font-display);font-weight:800;font-size:1.1rem;letter-spacing:.01em;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
   .brand-tag{font-family:var(--font-body);font-size:.62rem;font-weight:700;letter-spacing:.08em;color:var(--color-bg);background:var(--color-accent2);padding:2px 6px;border-radius:4px;}
   nav.main-nav{display:flex;align-items:center;gap:24px;}
@@ -429,10 +429,7 @@
 <header class="site-header">
   <div class="nav-wrap">
     <a class="brand" href="#top">
-      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-        <path d="M18 6c3 6-3 9-3 15a9 9 0 0018 0c0-6-6-9-3-15" stroke="#D62828" stroke-width="2.2" stroke-linecap="round"/>
-        <path d="M8 40c4-10 10-14 16-14s12 4 16 14" stroke="#E8B84B" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
-      </svg>
+      <img class="brand-mark" src="img/logo.png" alt="" aria-hidden="true" width="42" height="42" loading="eager">
       <span class="brand-name">Instintos Nocturnos Rock<span class="brand-tag" aria-hidden="true">INR</span></span>
     </a>
     <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mainNav" aria-label="Abrir menú">
@@ -688,7 +685,10 @@
 <footer class="site-footer">
   <div class="container footer-grid">
     <div>
-      <span class="brand-name" style="color:#fff;font-family:var(--font-display);font-weight:800;text-transform:uppercase;">Instintos Nocturnos Rock<span class="brand-tag" aria-hidden="true">INR</span></span>
+      <span class="brand-name" style="color:#fff;font-family:var(--font-display);font-weight:800;text-transform:uppercase;">
+        <img src="img/logo.png" alt="" aria-hidden="true" width="34" height="34" style="object-fit:contain;" loading="lazy">
+        Instintos Nocturnos Rock<span class="brand-tag" aria-hidden="true">INR</span>
+      </span>
       <p style="margin-top:10px;">Hard rock / rock alternativo desde Buenos Aires, Argentina. Formados en 2018.</p>
     </div>
     <div>
