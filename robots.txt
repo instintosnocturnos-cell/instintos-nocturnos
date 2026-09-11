@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /app.html
 
-Sitemap: https://www.instintosnocturnos.com.ar/sitemap.xml
+Sitemap: https://instintosnocturnos.com.ar/sitemap.xml
