@@ -688,7 +688,18 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const fmtMoney = n => '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-AR') : '—';
-const fmtDateTime = d => d ? new Date(d).toLocaleString('es-AR') : '—';
+// hour12:false fuerza formato 24hs siempre — sin esto, algunos navegadores
+// muestran la hora en formato 12hs sin aclarar AM/PM (ej: 19:00 se ve como "07:00").
+const fmtDateTime = d => d ? new Date(d).toLocaleString('es-AR', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+// Convierte un Date a "YYYY-MM-DDTHH:mm" en hora LOCAL (no UTC), que es lo que
+// espera el value de un <input type="datetime-local">. Usar toISOString() acá
+// sería un bug: esa función siempre devuelve la hora en UTC, corriendo el
+// horario mostrado según el huso horario (ej: 19hs locales aparecerían como 22hs).
+function toLocalDatetimeInputValue(date) {
+  const d = new Date(date);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 const ESTADOS = ['pendiente', 'confirmado', 'entregado', 'cancelado'];
 const ESTADO_LABEL = { pendiente: 'Pendiente', confirmado: 'Confirmado', entregado: 'Entregado', cancelado: 'Cancelado' };
 const TIPO_LABEL = { remera: 'Remera', buzo: 'Buzo', vinilo: 'Vinilo', entrada: 'Entrada', otro: 'Otro' };
@@ -1182,10 +1193,29 @@ function renderShowsTable() {
       <td>${escapeHtml(s.ciudad)}</td>
       <td>${s.link_entradas ? `<a href="${escapeHtml(s.link_entradas)}" target="_blank" rel="noopener">Ver link</a>` : 'Puerta'}</td>
       <td><span class="badge badge-${s.estado === 'confirmado' ? 'confirmado-show' : s.estado}">${s.estado}</span></td>
-      <td><button class="btn btn-outline btn-sm" data-edit-show="${s.id}">Editar</button></td>
+      <td style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" data-edit-show="${s.id}">Editar</button>
+        <button class="btn btn-danger btn-sm" data-delete-show="${s.id}">Eliminar</button>
+      </td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Todavía no hay shows cargados.</td></tr>';
   $$('[data-edit-show]', $('#showsTableBody')).forEach(btn => {
     btn.addEventListener('click', () => openShowModal(showsCache.find(s => s.id === btn.dataset.editShow)));
+  });
+  $$('[data-delete-show]', $('#showsTableBody')).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const showRow = showsCache.find(s => s.id === btn.dataset.deleteShow);
+      askConfirm({
+        title: 'Eliminar show',
+        message: `¿Eliminar definitivamente el show en ${showRow?.lugar || ''} (${fmtDate(showRow?.fecha)})? Esta acción no se puede deshacer. Si preferís mantenerlo en el historial pero marcarlo como no vigente, usá "Editar" y cambiá el estado a Cancelado en vez de eliminarlo.`,
+        confirmText: 'Eliminar',
+        onConfirm: async () => {
+          const { error } = await db.from('shows').delete().eq('id', showRow.id);
+          if (error) { toast('No se pudo eliminar: ' + error.message, 'error'); return; }
+          toast('Show eliminado.');
+          loadShowsPanel();
+        },
+      });
+    });
   });
 }
 function openShowModal(showRow) {
@@ -1193,7 +1223,7 @@ function openShowModal(showRow) {
   $('#showStatus').textContent = '';
   $('#showModalTitle').textContent = showRow ? 'Editar show' : 'Nuevo show';
   $('#sh-id').value = showRow?.id || '';
-  $('#sh-fecha').value = showRow ? new Date(showRow.fecha).toISOString().slice(0, 16) : '';
+  $('#sh-fecha').value = showRow ? toLocalDatetimeInputValue(showRow.fecha) : '';
   $('#sh-lugar').value = showRow?.lugar || '';
   $('#sh-ciudad').value = showRow?.ciudad || '';
   $('#sh-direccion').value = showRow?.direccion || '';
