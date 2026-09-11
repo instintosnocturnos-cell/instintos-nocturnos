@@ -234,11 +234,7 @@
     background:radial-gradient(circle at 30% 20%, var(--color-primary-dark), var(--color-bg) 70%);
     overflow:hidden;box-shadow:var(--shadow-soft);border:1px solid var(--color-border);
   }
-  .hero-art .moon{position:absolute;top:14%;right:14%;width:34%;}
-  .hero-art .caption{
-    position:absolute;bottom:24px;left:24px;right:24px;color:#fff;
-    font-family:var(--font-display);font-size:1.15rem;text-transform:uppercase;
-  }
+  .hero-art img{width:100%;height:100%;object-fit:cover;display:block;}
   .jagged-divider{display:block;width:100%;height:46px;margin-top:-2px;}
 
   /* ---------- Sections ---------- */
@@ -325,6 +321,8 @@
     text-align:center;padding:16px;border:1px solid var(--color-border);
   }
   @media (min-width:720px){ .gallery-item{flex-basis:32%;} }
+  .gallery-item-photo{padding:0;overflow:hidden;}
+  .gallery-item-photo img{width:100%;height:100%;object-fit:cover;display:block;}
 
   /* ---------- EPK ---------- */
   .epk-card{
@@ -462,11 +460,8 @@
           <a class="btn btn-outline" href="#musica">Escuchar ahora</a>
         </div>
       </div>
-      <div class="hero-art" role="img" aria-label="Ilustración de una luna creciente sobre fondo violeta oscuro, identidad visual de Instintos Nocturnos Rock">
-        <svg class="moon" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-          <path d="M55 8C35 8 20 26 20 50s15 42 35 42c-25-6-40-24-40-42S30 14 55 8z" fill="#E8B84B" opacity=".85"/>
-        </svg>
-        <p class="caption">Foto o video del vivo<br>(reemplazar por imagen real)</p>
+      <div class="hero-art">
+        <img src="img/banda1.jpeg" alt="Instintos Nocturnos Rock" loading="eager">
       </div>
     </div>
     <svg class="jagged-divider" viewBox="0 0 1440 46" preserveAspectRatio="none" aria-hidden="true">
@@ -578,7 +573,7 @@
         <h2>En vivo</h2>
       </div>
       <div class="gallery-track" tabindex="0" role="region" aria-label="Galería de fotos y videos en vivo, desplazable horizontalmente">
-        <div class="gallery-item">Foto 1<br>show en Niceto</div>
+        <div class="gallery-item gallery-item-photo"><img src="img/banda1.jpeg" alt="Instintos Nocturnos Rock" loading="lazy"></div>
         <div class="gallery-item">Foto 2<br>backstage</div>
         <div class="gallery-item">Foto 3<br>público</div>
         <div class="gallery-item">Foto 4<br>grabación de estudio</div>
