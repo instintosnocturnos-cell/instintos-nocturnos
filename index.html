@@ -248,11 +248,11 @@
     background:radial-gradient(circle at 30% 20%, var(--color-primary-dark), var(--color-bg) 70%);
     overflow:hidden;box-shadow:var(--shadow-soft);border:1px solid var(--color-border);
   }
-  .hero-art img{width:100%;height:100%;object-fit:cover;display:block;}
+  .hero-art img{width:100%;height:100%;object-fit:contain;display:block;}
   .hero-art #heroCarousel,
   .hero-art .carousel-inner,
   .hero-art .carousel-item{height:100%;}
-  .hero-art .carousel-item img{object-position:center 18%;}
+  .hero-art .carousel-item img{object-position:center center;}
   .hero-art .carousel-indicators{margin-bottom:0.6rem;}
   .hero-art .carousel-indicators [data-bs-target]{background-color:var(--color-accent2);}
   .jagged-divider{display:block;width:100%;height:46px;margin-top:-2px;}
@@ -311,9 +311,29 @@
   .show-place{font-weight:700;color:var(--color-ink);}
   .show-city{color:var(--color-ink-soft);font-size:.9rem;}
   .show-poster{
-    width:56px;height:56px;object-fit:cover;border-radius:var(--radius-sm);
-    border:1px solid var(--color-border);flex-shrink:0;
+    width:64px;height:84px;object-fit:contain;border-radius:var(--radius-sm);
+    border:1px solid var(--color-border);flex-shrink:0;background:var(--color-surface-alt);padding:3px;
+    cursor:zoom-in;transition:border-color .2s ease, transform .2s ease;
   }
+  .show-poster:hover, .show-poster:focus-visible{border-color:var(--color-accent2);transform:translateY(-2px);}
+  .poster-lightbox{
+    position:fixed;inset:0;z-index:300;background:rgba(10,7,7,.92);
+    display:flex;align-items:center;justify-content:center;padding:40px;
+    animation:posterFadeIn .15s ease;
+  }
+  .poster-lightbox[hidden]{display:none;}
+  @keyframes posterFadeIn{from{opacity:0;}to{opacity:1;}}
+  .poster-lightbox img{
+    max-width:min(90vw, 560px);max-height:85vh;width:auto;height:auto;
+    border-radius:var(--radius-md);box-shadow:0 30px 70px -20px rgba(0,0,0,.6);
+    border:1px solid var(--color-border);
+  }
+  .poster-lightbox-close{
+    position:absolute;top:18px;right:22px;background:var(--color-surface);color:var(--color-ink);
+    border:1px solid var(--color-border);border-radius:999px;width:42px;height:42px;font-size:1.1rem;
+    cursor:pointer;line-height:1;
+  }
+  .poster-lightbox-close:hover{border-color:var(--color-accent2);color:var(--color-accent2);}
   .show-badge{
     padding:7px 16px;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
     background:var(--color-surface-alt);color:var(--color-ink-soft);
@@ -341,7 +361,7 @@
   /* ---------- Galería (carousel Bootstrap) ---------- */
   #galeriaCarousel{border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--color-border);box-shadow:var(--shadow-soft);}
   #galeriaCarousel .carousel-item{aspect-ratio:16/9;background:linear-gradient(150deg,var(--color-surface-alt),var(--color-primary-dark));}
-  #galeriaCarousel .carousel-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  #galeriaCarousel .carousel-item img{width:100%;height:100%;object-fit:contain;display:block;}
   .gallery-placeholder{
     height:100%;display:flex;align-items:center;justify-content:center;
     color:var(--color-ink-soft);font-weight:600;text-align:center;padding:16px;font-size:1.1rem;
@@ -748,6 +768,12 @@
   <p class="footer-bottom">© <span id="year"></span> Instintos Nocturnos Rock. Todos los derechos reservados.</p>
 </footer>
 
+<!-- Lightbox: ver en grande el flyer de un show al hacer click en su miniatura -->
+<div class="poster-lightbox" id="posterLightbox" role="dialog" aria-modal="true" aria-label="Imagen del show ampliada" hidden>
+  <button type="button" class="poster-lightbox-close" id="posterLightboxClose" aria-label="Cerrar">✕</button>
+  <img id="posterLightboxImg" src="" alt="">
+</div>
+
 <!-- Bootstrap bundle (Popper incluido): navbar colapsable + carousel de la galería -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Supabase JS (solo se usa para leer shows/merch en vivo; landing 100% funcional sin conexión también) -->
@@ -776,6 +802,38 @@
       if (mainNavCollapseEl.classList.contains('show')) mainNavCollapse.hide();
     }));
   }
+
+  // ---------- Lightbox: ampliar el flyer de un show al hacer click ----------
+  (function initPosterLightbox(){
+    const lightbox = document.getElementById('posterLightbox');
+    const lightboxImg = document.getElementById('posterLightboxImg');
+    const closeBtn = document.getElementById('posterLightboxClose');
+    if (!lightbox || !lightboxImg || !closeBtn) return;
+    function openLightbox(src, alt){
+      lightboxImg.src = src;
+      lightboxImg.alt = alt || '';
+      lightbox.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox(){
+      lightbox.hidden = true;
+      lightboxImg.src = '';
+      document.body.style.overflow = '';
+    }
+    // Delegación: las miniaturas (.show-poster) se generan dinámicamente al
+    // cargar los shows, así que escuchamos en document en vez de en cada img.
+    document.addEventListener('click', (e) => {
+      const poster = e.target.closest('.show-poster');
+      if (poster) openLightbox(poster.src, poster.alt);
+    });
+    document.addEventListener('keydown', (e) => {
+      const poster = e.target.closest && e.target.closest('.show-poster');
+      if (poster && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openLightbox(poster.src, poster.alt); }
+    });
+    closeBtn.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lightbox.hidden) closeLightbox(); });
+  })();
 
   function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -824,7 +882,7 @@
         badgeHtml = '<span class="show-badge confirmado">Entrada en puerta</span>';
       }
       const imgHtml = s.imagen_url
-        ? `<img class="show-poster" src="${escapeHtml(s.imagen_url)}" alt="Flyer: ${escapeHtml(s.lugar)}" loading="lazy">`
+        ? `<img class="show-poster" src="${escapeHtml(s.imagen_url)}" alt="Flyer: ${escapeHtml(s.lugar)}" loading="lazy" tabindex="0" role="button" aria-label="Ver flyer de ${escapeHtml(s.lugar)} en grande">`
         : '';
       card.innerHTML = `
         ${imgHtml}
