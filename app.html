@@ -333,7 +333,7 @@
       </div>
       <div class="table-wrap card">
         <table>
-          <thead><tr><th>Fecha</th><th>Lugar</th><th>Ciudad</th><th>Entradas</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Flyer</th><th>Fecha</th><th>Lugar</th><th>Ciudad</th><th>Entradas</th><th>Estado</th><th></th></tr></thead>
           <tbody id="showsTableBody"></tbody>
         </table>
       </div>
@@ -532,6 +532,13 @@
           <option value="cancelado">Cancelado</option>
           <option value="finalizado">Finalizado</option>
         </select>
+      </div>
+      <div class="field">
+        <label for="sh-imagen">Flyer / imagen del show <span class="hint">(opcional)</span></label>
+        <input type="hidden" id="sh-imagen-url">
+        <img id="sh-imagen-preview" alt="" hidden style="display:block;max-width:160px;max-height:160px;border-radius:8px;margin-bottom:8px;object-fit:cover;">
+        <input type="file" id="sh-imagen" accept="image/*">
+        <p class="hint" id="sh-imagen-hint" style="margin-top:4px;"></p>
       </div>
       <p class="form-status" id="showStatus" role="alert"></p>
       <button class="btn btn-primary btn-block" type="submit">Guardar</button>
@@ -1187,6 +1194,7 @@ async function loadShowsPanel() {
 function renderShowsTable() {
   $('#showsTableBody').innerHTML = showsCache.map(s => `
     <tr>
+      <td>${s.imagen_url ? `<img src="${escapeHtml(s.imagen_url)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">` : '—'}</td>
       <td>${fmtDateTime(s.fecha)}</td>
       <td>${escapeHtml(s.lugar)}</td>
       <td>${escapeHtml(s.ciudad)}</td>
@@ -1196,7 +1204,7 @@ function renderShowsTable() {
         <button class="btn btn-outline btn-sm" data-edit-show="${s.id}">Editar</button>
         <button class="btn btn-danger btn-sm" data-delete-show="${s.id}">Eliminar</button>
       </td>
-    </tr>`).join('') || '<tr><td colspan="6" class="empty">Todavía no hay shows cargados.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Todavía no hay shows cargados.</td></tr>';
   $$('[data-edit-show]', $('#showsTableBody')).forEach(btn => {
     btn.addEventListener('click', () => openShowModal(showsCache.find(s => s.id === btn.dataset.editShow)));
   });
@@ -1228,12 +1236,41 @@ function openShowModal(showRow) {
   $('#sh-direccion').value = showRow?.direccion || '';
   $('#sh-link').value = showRow?.link_entradas || '';
   $('#sh-estado').value = showRow?.estado || 'confirmado';
+  $('#sh-imagen-url').value = showRow?.imagen_url || '';
+  $('#sh-imagen').value = '';
+  const preview = $('#sh-imagen-preview');
+  if (showRow?.imagen_url) { preview.src = showRow.imagen_url; preview.hidden = false; }
+  else { preview.hidden = true; preview.src = ''; }
+  $('#sh-imagen-hint').textContent = '';
   openModal('modalShow');
+}
+// Sube el flyer elegido al bucket público "shows" y devuelve la URL
+// pública para guardarla en la fila del show. Si el admin no elige un
+// archivo nuevo, se mantiene la imagen que ya tenía (o ninguna).
+async function uploadShowImage(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: upErr } = await db.storage.from('shows').upload(path, file, { upsert: true, cacheControl: '3600' });
+  if (upErr) throw upErr;
+  const { data } = db.storage.from('shows').getPublicUrl(path);
+  return data.publicUrl;
 }
 $('#showForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const status = $('#showStatus');
   const id = $('#sh-id').value;
+  let imagenUrl = $('#sh-imagen-url').value || null;
+  const fileInput = $('#sh-imagen');
+  const file = fileInput.files && fileInput.files[0];
+  if (file) {
+    status.textContent = 'Subiendo imagen...'; status.className = 'form-status';
+    try {
+      imagenUrl = await uploadShowImage(file);
+    } catch (upErr) {
+      status.textContent = 'No se pudo subir la imagen: ' + upErr.message; status.className = 'form-status error';
+      return;
+    }
+  }
   const payload = {
     fecha: new Date($('#sh-fecha').value).toISOString(),
     lugar: $('#sh-lugar').value.trim(),
@@ -1241,6 +1278,7 @@ $('#showForm').addEventListener('submit', async (e) => {
     direccion: $('#sh-direccion').value.trim() || null,
     link_entradas: $('#sh-link').value.trim() || null,
     estado: $('#sh-estado').value,
+    imagen_url: imagenUrl,
   };
   if (!payload.lugar || !payload.ciudad) {
     status.textContent = 'Completá lugar y ciudad.'; status.className = 'form-status error'; return;

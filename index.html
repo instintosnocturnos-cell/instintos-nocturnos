@@ -82,6 +82,14 @@
     },
     {
       "@type": "MusicEvent",
+      "name": "The Jack's Experience presenta: 7 Magníficos + Instintos Nocturnos Rock",
+      "startDate": "2026-11-11T21:00:00-03:00",
+      "location": { "@type": "Place", "name": "Makena", "address": "Fitz Roy 1519, CABA, Argentina" },
+      "performer": { "@type": "MusicGroup", "name": "Instintos Nocturnos Rock" },
+      "image": "https://instintosnocturnos.com.ar/img/flyer-makena-2026-11-11.jpg"
+    },
+    {
+      "@type": "MusicEvent",
       "name": "Instintos Nocturnos Rock en Groove",
       "startDate": "2026-11-21T21:00:00-03:00",
       "location": { "@type": "Place", "name": "Groove", "address": "CABA, Argentina" },
@@ -241,6 +249,12 @@
     overflow:hidden;box-shadow:var(--shadow-soft);border:1px solid var(--color-border);
   }
   .hero-art img{width:100%;height:100%;object-fit:cover;display:block;}
+  .hero-art #heroCarousel,
+  .hero-art .carousel-inner,
+  .hero-art .carousel-item{height:100%;}
+  .hero-art .carousel-item img{object-position:center 18%;}
+  .hero-art .carousel-indicators{margin-bottom:0.6rem;}
+  .hero-art .carousel-indicators [data-bs-target]{background-color:var(--color-accent2);}
   .jagged-divider{display:block;width:100%;height:46px;margin-top:-2px;}
 
   /* ---------- Sections ---------- */
@@ -296,6 +310,10 @@
   }
   .show-place{font-weight:700;color:var(--color-ink);}
   .show-city{color:var(--color-ink-soft);font-size:.9rem;}
+  .show-poster{
+    width:56px;height:56px;object-fit:cover;border-radius:var(--radius-sm);
+    border:1px solid var(--color-border);flex-shrink:0;
+  }
   .show-badge{
     padding:7px 16px;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
     background:var(--color-surface-alt);color:var(--color-ink-soft);
@@ -463,7 +481,20 @@
         </div>
       </div>
       <div class="hero-art">
-        <img src="img/banda1.jpeg" alt="Instintos Nocturnos Rock" loading="eager">
+        <div id="heroCarousel" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="4500">
+          <div class="carousel-indicators">
+            <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Foto 1"></button>
+            <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Foto 2"></button>
+          </div>
+          <div class="carousel-inner">
+            <div class="carousel-item active">
+              <img src="img/banda1.jpeg" alt="Instintos Nocturnos Rock" loading="eager">
+            </div>
+            <div class="carousel-item">
+              <img src="img/flyer-makena-2026-11-11.jpg" alt="Próximo show: The Jack's Experience presenta 7 Magníficos + Instintos Nocturnos Rock, Makena, 11 de noviembre 2026" loading="eager">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <svg class="jagged-divider" viewBox="0 0 1440 46" preserveAspectRatio="none" aria-hidden="true">
@@ -761,9 +792,10 @@
 
   // ---------- Shows en vivo desde Supabase, con fallback ----------
   const FALLBACK_SHOWS = [
-    { fecha: '2026-10-17T21:00:00-03:00', lugar: 'Niceto Club', ciudad: 'CABA', link_entradas: 'https://www.niceto.com.ar/entradas', estado: 'confirmado' },
-    { fecha: '2026-11-07T21:00:00-03:00', lugar: 'La Trastienda', ciudad: 'CABA', link_entradas: 'https://www.latrastienda.com/entradas', estado: 'confirmado' },
-    { fecha: '2026-11-21T21:00:00-03:00', lugar: 'Groove', ciudad: 'CABA', link_entradas: null, estado: 'confirmado' },
+    { fecha: '2026-10-17T21:00:00-03:00', lugar: 'Niceto Club', ciudad: 'CABA', link_entradas: 'https://www.niceto.com.ar/entradas', estado: 'confirmado', imagen_url: null },
+    { fecha: '2026-11-07T21:00:00-03:00', lugar: 'La Trastienda', ciudad: 'CABA', link_entradas: 'https://www.latrastienda.com/entradas', estado: 'confirmado', imagen_url: null },
+    { fecha: '2026-11-11T21:00:00-03:00', lugar: 'Makena', ciudad: 'CABA', link_entradas: null, estado: 'confirmado', imagen_url: 'img/flyer-makena-2026-11-11.jpg' },
+    { fecha: '2026-11-21T21:00:00-03:00', lugar: 'Groove', ciudad: 'CABA', link_entradas: null, estado: 'confirmado', imagen_url: null },
   ];
 
   function renderShows(list){
@@ -791,7 +823,11 @@
       } else {
         badgeHtml = '<span class="show-badge confirmado">Entrada en puerta</span>';
       }
+      const imgHtml = s.imagen_url
+        ? `<img class="show-poster" src="${escapeHtml(s.imagen_url)}" alt="Flyer: ${escapeHtml(s.lugar)}" loading="lazy">`
+        : '';
       card.innerHTML = `
+        ${imgHtml}
         <div>
           <div class="show-date">${fmtShowDate(s.fecha)}</div>
           <div class="show-place">${escapeHtml(s.lugar)}</div>
@@ -813,7 +849,7 @@
       const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data, error } = await client
         .from('shows')
-        .select('fecha, lugar, ciudad, link_entradas, estado')
+        .select('fecha, lugar, ciudad, link_entradas, estado, imagen_url')
         .order('fecha', { ascending: true });
       if (error || !data || data.length === 0) throw error || new Error('sin datos');
       renderShows(data);
